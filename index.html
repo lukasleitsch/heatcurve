@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WOLF Heizkurven‑Simulator</title>
+  <style>
+    /* ======= Reset & base ======= */
+    :root {
+      --bg: #0b0d10;
+      --panel: #12161b;
+      --panel-2: #0e1116;
+      --text: #e7ecf3;
+      --muted: #9fb0c5;
+      --accent: #ff6a3d;
+      --accent-2: #8ef6a0;
+      --danger: #ff6b6b;
+      --card: #161b22;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --radius-xl: 18px;
+      --radius-lg: 14px;
+      --radius-md: 12px;
+      --radius-sm: 10px;
+      --gap: 16px;
+      --gap-lg: 24px;
+      --gap-xl: 32px;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0; background: radial-gradient(1200px 800px at 80% -20%, #142035 0%, transparent 50%) , var(--bg);
+      color: var(--text); font-family: var(--sans);
+      line-height: 1.45; letter-spacing: .2px;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ======= Layout ======= */
+    .wrap {
+      display: flex; flex-direction: column; gap: var(--gap-xl);
+      max-width: 780px; margin: 32px auto 48px; padding: 0 var(--gap);
+    }
+    header { margin-bottom: -8px; }
+    h1 { font-size: clamp(24px, 3vw, 32px); margin: 0 0 6px; letter-spacing: .3px; }
+    .lede { color: var(--muted); max-width: 85ch; }
+
+    .sidebar { position: static; padding: 0; }
+
+    .reset-button {
+      margin-top: 14px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: none;
+      border: none;
+      color: var(--muted);
+      font: inherit;
+      font-size: 13px;
+      letter-spacing: .2px;
+      padding: 0;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+    .reset-button:hover { color: var(--accent); }
+    .reset-button:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+      border-radius: 6px;
+    }
+
+    .card { background: var(--card); border:1px solid #222936; border-radius: var(--radius-lg); padding: 14px 14px; box-shadow: var(--shadow); }
+    .card + .card { margin-top: var(--gap); }
+
+    .formula { font-family: var(--mono); color: #cfe3ff; font-size: 13px; white-space: pre-wrap; user-select: text; }
+
+    .main { min-height: 480px; }
+
+    /* ======= Stat widgets over the chart ======= */
+    .stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--gap);
+      margin-bottom: var(--gap-lg);
+    }
+    .stat { background: linear-gradient(180deg,#17202b,#131a23); border:1px solid #223041; border-radius: var(--radius-lg); padding: 12px 14px; box-shadow: var(--shadow); }
+    .stat h3 { margin: 0; font-size: 12px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); }
+    .stat .value { font-variant-numeric: tabular-nums; font-weight: 700; font-size: clamp(20px, 4vw, 28px); margin-top: 6px; }
+    .stat small { color: var(--muted); }
+
+    /* ======= Controls ======= */
+    .group { display:flex; flex-direction: column; gap: 6px; align-items: stretch; }
+    .group + .group { margin-top: 14px; }
+    .group label { color: var(--muted); font-size: 13px; }
+
+    .input-row { display: flex; gap: 6px; align-items: stretch; }
+
+    .card details { margin-top: 18px; }
+    .card details summary { cursor: pointer; font-weight: 600; color: #cfe3ff; margin-bottom: 6px; }
+
+    .input-suffix { position: relative; flex: 1 1 auto; display: flex; }
+    .input-suffix input { flex: 1 1 auto; }
+    .input-suffix-label {
+      position: absolute;
+      right: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted);
+      opacity: .85;
+      pointer-events: none;
+      font-weight: 600;
+    }
+
+    input[type="number"], input[type="range"] { width: 100%; appearance: none; -moz-appearance: textfield; background: linear-gradient(180deg,#0f141b,#0b0f14); border:1px solid #233044; color: var(--text); padding: 12px 56px 12px 12px; border-radius: var(--radius-md); font-size: 15px; box-shadow: inset 0 0 0 1px #0d1117; transition: border-color .15s ease, box-shadow .15s ease; }
+    input[type="number"] { min-height: 48px; }
+    input[type="number"]::-webkit-outer-spin-button, input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type="number"]:focus-visible, input[type="range"]:focus-visible {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: inset 0 0 0 1px rgba(13,17,23,.6), 0 0 0 2px rgba(255,106,61,.35);
+    }
+
+    .stepper { display:flex; flex-direction:row; align-items:stretch; gap:4px; align-self:stretch; }
+    .stepper-btn {
+      background: linear-gradient(180deg,#182131,#101722);
+      border:1px solid #2a3a50;
+      color: var(--text);
+      font-size: 18px;
+      line-height: 1;
+      padding: 0;
+      width: 38px;
+      min-height: 48px;
+      border-radius: var(--radius-sm);
+      box-shadow: inset 0 0 0 1px rgba(8,12,18,.7);
+      cursor: pointer;
+      transition: border-color .15s ease, transform .1s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex: 1 1 38px;
+    }
+    .stepper-btn:hover { border-color: #3d536f; }
+    .stepper-btn:active { transform: translateY(1px); }
+    .stepper-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+    .range-row { margin-top: 0; }
+    .range-label-row { display:flex; align-items:center; justify-content:space-between; gap: 12px; }
+    .range-value { color: var(--muted); font-size: 13px; font-weight: 600; letter-spacing: .3px; }
+    input[type="range"] { height: 34px; background: transparent; padding:0; }
+    input[type="range"]::-webkit-slider-runnable-track { height: 6px; background: linear-gradient(90deg,#1f2b3a,#2a3a51); border-radius: 999px; }
+    input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 999px; background: var(--accent); margin-top: -6px; box-shadow: 0 0 0 4px rgba(92,200,255,.15); }
+    input[type="range"]::-moz-range-track { height: 6px; background: linear-gradient(90deg,#1f2b3a,#2a3a51); border-radius: 999px; }
+    input[type="range"]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 999px; background: var(--accent); border: none; box-shadow: 0 0 0 4px rgba(92,200,255,.15); }
+
+    /* ======= SVG Chart ======= */
+    .chart-card { background: linear-gradient(180deg,#121821,#0b1016); border:1px solid #1d2633; border-radius: var(--radius-xl); padding: 16px; box-shadow: var(--shadow); }
+    .chart-header { display:flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px; }
+    .chart-title { font-weight: 600; color:#cfe3ff; letter-spacing:.3px; }
+
+    svg { width: 100%; height: 460px; display:block; }
+    .grid line { stroke:#223146; stroke-width:1; opacity:.5; }
+    .axis { stroke:#5f728c; stroke-width:1.2; }
+    .tick { stroke:#3a4a60; stroke-width:1; }
+    .tick-label { fill:#8aa0ba; font-size:12px; }
+    .curve { fill: none; stroke: var(--accent); stroke-width: 3; }
+    .pt { fill:#ffc861; stroke:#2c3442; stroke-width:1; }
+    .pt-current { fill:#59c3ff; stroke:#1d2938; stroke-width:1.5; }
+    .dash { stroke-dasharray: 6 6; stroke:#9fb0c5; opacity:.8; }
+    .dash.secondary { stroke:#5aa0ff; opacity:.5; }
+
+    .footer { margin-top: 20px; color: var(--muted); }
+    .disclaimer { opacity:.9; border: 1px dashed #2b3850; padding: 12px; border-radius: var(--radius-md); background:#0d1219; }
+
+    .invalid { outline: 2px solid var(--danger); }
+
+    @media (max-width: 600px) {
+      .wrap { padding: 0 var(--gap-sm, 12px); margin: 24px auto 36px; }
+      .stats { grid-template-columns: 1fr; }
+      .chart-card { padding: 14px; }
+      svg { height: 380px; }
+    }
+
+    @media (min-width: 960px) {
+      .wrap {
+        display: grid;
+        grid-template-columns: 360px 1fr;
+        gap: var(--gap-xl);
+        max-width: 1200px;
+        margin: 40px auto;
+        padding: 0 var(--gap-xl);
+      }
+      header { grid-column: 1 / -1; }
+      .sidebar { position: sticky; top: 20px; align-self: start; }
+      .footer { grid-column: 1 / -1; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>WOLF Heizkurven‑Simulator</h1>
+      <p class="lede">Visualisiere und verstehe, wie eine Heizregelung aus der Außentemperatur eine Vorlaufsolltemperatur ableitet. Trage deine Werte ein, simuliere die Außentemperatur und sieh sofort, wie sich die Vorlauftemperatur ändert. Das Tool bildet die Heizkurven‑Simulation nach, wie sie an WOLF‑Anlagen über das BM‑2 Moduls eingestellt wird.</p>
+    </header>
+
+    <!-- ======= SIDEBAR ======= -->
+    <aside class="sidebar">
+      <div class="card">
+        <h2 style="margin:0 0 8px;font-size:16px">Einstellungen</h2>
+        <div class="group">
+          <label for="sockel">Sockeltemperatur</label>
+          <div class="input-row">
+            <div class="input-suffix">
+              <input id="sockel" type="number" step="1" min="10" max="60" value="28" />
+              <span class="input-suffix-label">°C</span>
+            </div>
+            <div class="stepper">
+              <button type="button" class="stepper-btn" data-step="-1" aria-label="Sockeltemperatur verringern">−</button>
+              <button type="button" class="stepper-btn" data-step="1" aria-label="Sockeltemperatur erhöhen">+</button>
+            </div>
+          </div>
+        </div>
+        <div class="group">
+          <label for="startpunkt">Startpunkt Außentemperatur</label>
+          <div class="input-row">
+            <div class="input-suffix">
+              <input id="startpunkt" type="number" step="1" min="0" max="20" value="12" />
+              <span class="input-suffix-label">°C</span>
+            </div>
+            <div class="stepper">
+              <button type="button" class="stepper-btn" data-step="-1" aria-label="Startpunkt Außentemperatur verringern">−</button>
+              <button type="button" class="stepper-btn" data-step="1" aria-label="Startpunkt Außentemperatur erhöhen">+</button>
+            </div>
+          </div>
+        </div>
+        <div class="group">
+          <label for="nat">Normaußentemperatur (NAT)</label>
+          <div class="input-row">
+            <div class="input-suffix">
+              <input id="nat" type="number" step="1" min="-20" max="0" value="-12" />
+              <span class="input-suffix-label">°C</span>
+            </div>
+            <div class="stepper">
+              <button type="button" class="stepper-btn" data-step="-1" aria-label="Normaußentemperatur verringern">−</button>
+              <button type="button" class="stepper-btn" data-step="1" aria-label="Normaußentemperatur erhöhen">+</button>
+            </div>
+          </div>
+        </div>
+        <div class="group">
+          <label for="tvnat">Vorlaufsolltemperatur bei Normaußentemperatur</label>
+          <div class="input-row">
+            <div class="input-suffix">
+              <input id="tvnat" type="number" step="1" min="20" max="77" value="34" />
+              <span class="input-suffix-label">°C</span>
+            </div>
+            <div class="stepper">
+              <button type="button" class="stepper-btn" data-step="-1" aria-label="Vorlaufsolltemperatur verringern">−</button>
+              <button type="button" class="stepper-btn" data-step="1" aria-label="Vorlaufsolltemperatur erhöhen">+</button>
+            </div>
+          </div>
+        </div>
+        <div class="group range-row">
+          <div class="range-label-row">
+            <label for="taktuell">Außentemperatur simulieren</label>
+            <span class="range-value"><span data-bind="tOut">10</span> °C</span>
+          </div>
+          <input id="taktuell" type="range" min="-20" max="20" step="0.1" value="10" />
+        </div>
+        <details>
+          <summary>Formel</summary>
+          <pre class="formula">m = (T_VL@NAT − T_Sockel) / (NAT − Start)
+T_VL(T_out) =
+  • T_Sockel                               , wenn T_out ≥ Start
+  • T_Sockel + m · (T_out − Start)         , wenn NAT ≤ T_out < Start
+(auf ±20 °C begrenzt)
+          </pre>
+          <p style="margin:.5rem 0 0; color:var(--muted); font-size:13px">Quelle: Offizielle WOLF BM‑2 Bedienungsanleitung (PDF):
+            <a href="https://www.wolf-heiztechnik.at/download/?file=1307.pdf" target="_blank" rel="noopener">wolf-heiztechnik.at/download/?file=1307.pdf</a>
+          </p>
+          <p style="margin:.25rem 0 0; color:var(--muted); font-size:12px">Grenzwerte (vereinfachte App‑Limits): Sockel 10–60 °C, Start 0–20 °C, NAT −20…0 °C, Vorlauf@NAT 20–77 °C.</p>
+        </details>
+      </div>
+      <button type="button" class="reset-button" id="reset-defaults">Standardwerte wiederherstellen</button>
+    </aside>
+
+    <!-- ======= MAIN ======= -->
+    <main class="main">
+      <div class="stats">
+        <div class="stat" id="stat-aussen">
+          <h3>Außen aktuell</h3>
+          <div class="value"><span data-bind="tOut">10</span> °C</div>
+          <small>Simuliert</small>
+        </div>
+        <div class="stat" id="stat-vorlauf">
+          <h3>Vorlauf (Soll)</h3>
+          <div class="value"><span data-bind="tVl">—</span> °C</div>
+          <small>aus Heizkurve</small>
+        </div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-header">
+          <div class="chart-title">Heizkurve</div>
+        </div>
+        <svg id="chart" viewBox="0 0 900 520" role="img" aria-label="Heizkurven‑Diagramm"></svg>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <div class="disclaimer">
+        <strong>Hinweis:</strong> Dieses Projekt steht in keinerlei Beziehung zur WOLF GmbH. Es dient ausschließlich zu Visualisierungs‑ und Lernzwecken und übernimmt keinerlei Gewähr für Richtigkeit, Vollständigkeit oder Eignung für den Betrieb einer Anlage.
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    // ======= Utilities =======
+    const $ = (sel, el=document) => el.querySelector(sel);
+
+    const defaults = Object.freeze({
+      sockel: 28,
+      start: 12,
+      nat: -12,
+      tvnat: 34,
+      tOut: 10,
+    });
+
+    function formatTemp(value){
+      if (!Number.isFinite(value)) return '—';
+      const rounded = Math.round(value * 10) / 10;
+      return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+    }
+
+    const model = { ...defaults };
+
+    // Load from localStorage if present
+    try { const saved = JSON.parse(localStorage.getItem('wolf-heizkurve-v2')||'null'); if(saved) Object.assign(model, saved); } catch {}
+
+    const inputs = {
+      sockel: $('#sockel'),
+      start: $('#startpunkt'),
+      nat: $('#nat'),
+      tvnat: $('#tvnat'),
+      tOut: $('#taktuell'),
+    };
+
+    const resetButton = $('#reset-defaults');
+
+    function syncInputsFromModel(){
+      inputs.sockel.value = model.sockel;
+      inputs.start.value = model.start;
+      inputs.nat.value = model.nat;
+      inputs.tvnat.value = model.tvnat;
+      inputs.tOut.value = model.tOut;
+    }
+
+    syncInputsFromModel();
+
+    // ======= Math (linear sections) =======
+    function slope(sockel, start, nat, tvnat){
+      const dx = (nat - start);
+      return dx === 0 ? 0 : (tvnat - sockel) / dx; // °C per °C (negative)
+    }
+    function tvlAt(Tout, sockel, start, nat, tvnat){
+      // piecewise: constant above start, linear between NAT..Start; clip to x-range
+      if (Tout >= start) return sockel;
+      if (Tout < -20) Tout = -20; if (Tout > 20) Tout = 20;
+      const m = slope(sockel, start, nat, tvnat);
+      return sockel + m * (Tout - start);
+    }
+
+    function adjustNumericInput(input, direction){
+      const rawStep = input.step && input.step !== 'any' ? Number(input.step) : 1;
+      const stepValue = Number.isFinite(rawStep) && rawStep !== 0 ? rawStep : 1;
+      const precision = stepValue % 1 !== 0 ? (stepValue.toString().split('.')[1] || '').length : 0;
+      const current = parseFloat(input.value);
+      let next = (Number.isFinite(current) ? current : 0) + direction * stepValue;
+      if (input.min !== '') next = Math.max(next, Number(input.min));
+      if (input.max !== '') next = Math.min(next, Number(input.max));
+      const factor = Math.pow(10, precision);
+      next = Math.round(next * factor) / factor;
+      input.value = precision ? next.toFixed(precision) : String(next);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.focus();
+    }
+
+    // ======= SVG chart =======
+    const svg = $('#chart');
+    const W = 900, H = 520, pad = {l:62, r:24, t:18, b:52};
+    const X_WARM = 20, X_COLD = -20; // warm links, kalt rechts
+
+    function scaleFactory(sockel, tvnat){
+      const yMaxData = Math.max(sockel, tvnat, 40);
+      const yMax = Math.ceil((yMaxData+4)/10)*10; // nice round up
+      const yMin = 0;
+      const x = (xv) => pad.l + ((xv - X_WARM) / (X_COLD - X_WARM)) * (W - pad.l - pad.r); // warm→links, kalt→rechts
+      const y = (yv) => H - pad.b - ((yv - yMin) / (yMax - yMin)) * (H - pad.t - pad.b);
+      return {x,y,yMin,yMax};
+    }
+
+    function draw(){
+      const sockel = Number(inputs.sockel.value);
+      const start = Number(inputs.start.value);
+      const nat   = Number(inputs.nat.value);
+      const tvnat = Number(inputs.tvnat.value);
+      let tOut  = Number(inputs.tOut.value);
+      if (!Number.isFinite(tOut)) tOut = 0;
+      tOut = Math.round(tOut * 10) / 10;
+      inputs.tOut.value = Number.isInteger(tOut) ? String(tOut) : tOut.toFixed(1);
+
+      const tOutLabel = formatTemp(tOut);
+
+      // basic validation (Start > NAT)
+      [inputs.start, inputs.nat].forEach(el=>el.classList.remove('invalid'));
+      if(!(start > nat)) { inputs.start.classList.add('invalid'); inputs.nat.classList.add('invalid'); }
+
+      const {x,y,yMin,yMax} = scaleFactory(sockel, tvnat);
+
+      svg.innerHTML = '';
+      const defs = svg.appendChild(el('defs'));
+      const grad = el('linearGradient', {id:'gradLine', x1:'0%', y1:'0%', x2:'100%', y2:'0%'});
+      grad.appendChild(el('stop', {offset:'0%', stopColor:'#59c3ff'}));
+      grad.appendChild(el('stop', {offset:'100%', stopColor:'#ffa658'}));
+      defs.appendChild(grad);
+
+      // grid
+      const gGrid = svg.appendChild(el('g', {class:'grid'}));
+      for(let xt=X_WARM; xt>=X_COLD; xt-=5){ gGrid.appendChild(el('line',{x1:x(xt),y1:y(yMin),x2:x(xt),y2:y(yMax)})); }
+      for(let yt=0; yt<=yMax; yt+=5){ gGrid.appendChild(el('line',{x1:x(X_WARM),y1:y(yt),x2:x(X_COLD),y2:y(yt)})); }
+
+      // axes
+      const gAxes = svg.appendChild(el('g', {class:'axes'}));
+      gAxes.appendChild(el('line', {class:'axis', x1:x(X_WARM), y1:y(0), x2:x(X_COLD), y2:y(0)})); // x
+      gAxes.appendChild(el('line', {class:'axis', x1:x(X_WARM), y1:y(0), x2:x(X_WARM), y2:y(yMax)})); // y at +20
+
+      // ticks & labels (every 5°C on x)
+      for(let xt=X_WARM; xt>=X_COLD; xt-=5){
+        gAxes.appendChild(el('line', {class:'tick', x1:x(xt), y1:y(0)-5, x2:x(xt), y2:y(0)+5}));
+        const lbl = el('text',{class:'tick-label', x:x(xt), y:y(0)+22, textAnchor:'middle'}); lbl.textContent = `${xt}°C`; gAxes.appendChild(lbl);
+      }
+      for(let yt=0; yt<=yMax; yt+=5){
+        gAxes.appendChild(el('line', {class:'tick', x1:x(X_WARM)-5, y1:y(yt), x2:x(X_WARM)+5, y2:y(yt)}));
+        const lbl = el('text',{class:'tick-label', x:x(X_WARM)-36, y:y(yt)+4, textAnchor:'end'}); lbl.textContent = `${yt}°C`; gAxes.appendChild(lbl);
+      }
+
+      // curve path (piecewise at 1°C steps)
+      const pts = [];
+      for(let X=20; X>=-20; X-=1){
+        const Y = tvlAt(X, sockel, start, nat, tvnat);
+        pts.push([x(X), y(Y)]);
+      }
+      const d = 'M'+pts.map(p=>p.join(',')).join(' L ');
+      svg.appendChild(el('path',{class:'curve', d}));
+
+      // points: Start + NAT
+      svg.appendChild(el('circle',{class:'pt', cx:x(start), cy:y(sockel), r:5}));
+      svg.appendChild(el('circle',{class:'pt', cx:x(nat), cy:y(tvnat), r:5}));
+
+      // helper lines for current T_out
+      const tVl = tvlAt(tOut, sockel, start, nat, tvnat);
+      svg.appendChild(el('line',{class:'dash', x1:x(tOut), y1:y(yMin), x2:x(tOut), y2:y(yMax)}));
+      svg.appendChild(el('line',{class:'dash', x1:x(X_WARM), y1:y(tVl), x2:x(X_COLD), y2:y(tVl)}));
+
+      // helper lines for Start and NAT points
+      svg.appendChild(el('line',{class:'dash secondary', x1:x(start), y1:y(yMin), x2:x(start), y2:y(yMax)}));
+      svg.appendChild(el('line',{class:'dash secondary', x1:x(nat), y1:y(yMin), x2:x(nat), y2:y(yMax)}));
+
+      // labels near helper lines
+      const labelTop = y(yMax) - 36;
+      const lbl1 = el('text', {x:x(tOut)+6, y:y(yMax)-12, class:'tick-label'}); lbl1.textContent = `Außen ${tOutLabel}°C`;
+      const lbl2 = el('text', {x:x(X_WARM)+8, y:y(tVl)-8, class:'tick-label'}); lbl2.textContent = `Vorlauf Soll ${tVl.toFixed(1)}°C`;
+      const lbl3 = el('text', {x:x(start)+6, y:labelTop, class:'tick-label'}); lbl3.textContent = `Start Außentemp ${start}°C`;
+      const lbl4 = el('text', {x:x(nat)+6, y:labelTop, class:'tick-label'}); lbl4.textContent = `Normaußentemp ${nat}°C`;
+      svg.appendChild(lbl1); svg.appendChild(lbl2); svg.appendChild(lbl3); svg.appendChild(lbl4);
+
+      // current intersection point
+      svg.appendChild(el('circle',{class:'pt-current', cx:x(tOut), cy:y(tVl), r:6}));
+
+      // update widgets
+      document.querySelectorAll('[data-bind="tOut"]').forEach(el => el.textContent = tOutLabel);
+      document.querySelector('[data-bind="tVl"]').textContent = tVl.toFixed(1);
+
+      // persist
+      model.sockel=sockel; model.start=start; model.nat=nat; model.tvnat=tvnat; model.tOut=tOut;
+      try{ localStorage.setItem('wolf-heizkurve-v2', JSON.stringify(model)); }catch{}
+    }
+
+    function el(tag, attrs={}){
+      const e = document.createElementNS('http://www.w3.org/2000/svg', tag);
+      for(const [k,v] of Object.entries(attrs)) e.setAttribute(k, v);
+      return e;
+    }
+
+    // events
+    if (resetButton) {
+      resetButton.addEventListener('click', () => {
+        Object.assign(model, defaults);
+        syncInputsFromModel();
+        draw();
+      });
+    }
+
+    Object.values(inputs).forEach(i=> i.addEventListener('input', draw));
+    document.querySelectorAll('.stepper-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const direction = Number(btn.dataset.step || 0);
+        if (!direction) return;
+        const input = btn.closest('.input-row')?.querySelector('input[type="number"]');
+        if (!input) return;
+        adjustNumericInput(input, direction);
+      });
+    });
+
+    // initial
+    draw();
+  </script>
+</body>
+</html>
