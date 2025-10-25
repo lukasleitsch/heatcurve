@@ -378,7 +378,6 @@ T_VL(T_out) =
       next = Math.round(next * factor) / factor;
       input.value = precision ? next.toFixed(precision) : String(next);
       input.dispatchEvent(new Event('input', { bubbles: true }));
-      input.focus();
     }
 
     // ======= SVG chart =======
